@@ -1,4 +1,3 @@
-// config/SecurityConfig.java
 package com.example.football_tickets.config;
 
 import com.example.football_tickets.security.JwtAuthenticationFilter;

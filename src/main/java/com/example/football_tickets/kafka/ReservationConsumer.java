@@ -21,23 +21,35 @@ public class ReservationConsumer {
         this.seatRepository = seatRepository;
     }
 
-    @KafkaListener(topics = "ticket_reservations", groupId = "football-ticketing")
+    @KafkaListener(
+            topics = "ticket_reservations",
+            groupId = "football-ticketing",
+            containerFactory = "reservationEventKafkaListenerContainerFactory"
+    )
     @Transactional
-    public void onReservation(ConsumerRecord<String, ReservationEvent> record) {
-        ReservationEvent event = record.value();
+    public void onReservation(ConsumerRecord<String, ReservationEvent> record,
+                              org.springframework.kafka.support.Acknowledgment ack) {
+        try {
+            ReservationEvent event = record.value();
+            System.out.printf("Kafka received key=%s, offset=%d, partition=%d%n",
+                    record.key(), record.offset(), record.partition());
 
-        System.out.printf("Kafka received key=%s, offset=%d, partition=%d%n",
-                record.key(), record.offset(), record.partition());
+            Reservation r = reservationRepository.findById(event.reservationId())
+                    .orElseThrow(() -> new IllegalStateException("Reservation not found"));
+            Seat seat = seatRepository.findById(event.seatId())
+                    .orElseThrow(() -> new IllegalStateException("Seat not found"));
 
-        Reservation r = reservationRepository.findById(event.reservationId())
-                .orElseThrow(() -> new IllegalStateException("Reservation not found"));
-        Seat seat = seatRepository.findById(event.seatId())
-                .orElseThrow(() -> new IllegalStateException("Seat not found"));
+            r.setStatus(ReservationStatus.CONFIRMED);
+            seat.setStatus(SeatStatus.BOOKED);
+            reservationRepository.save(r);
+            seatRepository.save(seat);
 
-        r.setStatus(ReservationStatus.CONFIRMED);
-        seat.setStatus(SeatStatus.BOOKED);
-        reservationRepository.save(r);
-        seatRepository.save(seat);
-        System.out.println("Reservation confirmed by consumer.");
+            System.out.println("Reservation confirmed by consumer.");
+            ack.acknowledge();
+        } catch (Exception ex) {
+            System.err.println("Consumer error: " + ex.getMessage());
+            throw ex;
+        }
     }
+
 }
