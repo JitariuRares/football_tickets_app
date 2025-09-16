@@ -1,4 +1,3 @@
-// auth/AuthController.java
 package com.example.football_tickets.auth;
 
 import com.example.football_tickets.security.JwtService;
